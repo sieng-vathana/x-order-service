@@ -1,0 +1,19 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: Vyntra-Order-Service
+  datasource:
+    url: jdbc:mysql://32.199.138.143:3306/my_springboot_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: db_user
+    password: Passw0rd123$$$
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
