@@ -3,6 +3,6 @@ server:
 
 spring:
   application:
-    name: X-Order-Service
+    name: x-order-service
   profiles:
     default: local
