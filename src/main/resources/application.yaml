@@ -3,6 +3,6 @@ server:
 
 spring:
   application:
-    name: Vyntra-Order-Service
+    name: X-Order-Service
   profiles:
     default: local

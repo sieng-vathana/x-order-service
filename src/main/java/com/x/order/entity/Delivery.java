@@ -1,4 +1,4 @@
-package com.VyntraOrderService.entity;
+package com.x.order.entity;
 
 import jakarta.persistence.*;
 import lombok.*;

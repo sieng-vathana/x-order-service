@@ -1,10 +1,10 @@
-package com.VyntraOrderService;
+package com.x.order;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class VyntraOrderServiceApplicationTests {
+class XOrderServiceApplicationTests {
 
 	@Test
 	void contextLoads() {

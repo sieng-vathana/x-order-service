@@ -1,13 +1,13 @@
-package com.VyntraOrderService;
+package com.x.order;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class VyntraOrderServiceApplication {
+public class XOrderServiceApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(VyntraOrderServiceApplication.class, args);
+		SpringApplication.run(XOrderServiceApplication.class, args);
 	}
 
 }
