@@ -2,7 +2,19 @@ server:
   port: ${ORDER_SERVICE_PORT:8083}
 
 spring:
+  banner:
+    location: classpath:banner.txt
+    mode: console
   application:
     name: x-order-service
   profiles:
     default: local
+
+x:
+  http:
+    logging:
+      enabled: true
+      server: x-order-service
+      hop: "x-api-gateway → x-bff → x-order-service"
+      hops:
+        /api/v1/orders: "x-api-gateway → x-bff → x-order-service"
