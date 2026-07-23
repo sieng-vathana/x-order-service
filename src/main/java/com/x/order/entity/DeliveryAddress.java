@@ -27,8 +27,26 @@ public class DeliveryAddress {
 
     private String phone;
 
-    @Column(columnDefinition = "TEXT")
-    private String address;
+    @Column(name = "province_city", length = 100)
+    private String provinceCity;
+
+    @Column(length = 100)
+    private String district;
+
+    @Column(length = 100)
+    private String commune;
+
+    @Column(length = 100)
+    private String village;
+
+    @Column(name = "street_address", length = 255)
+    private String streetAddress;
+
+    @Column(length = 255)
+    private String landmark;
+
+    @Column(name = "delivery_instructions", length = 500)
+    private String deliveryInstructions;
 
     @Column(precision = 10, scale = 8)
     private BigDecimal latitude;

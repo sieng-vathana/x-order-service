@@ -44,8 +44,9 @@ public class Order {
     @Column(name = "order_channel")
     private String orderChannel; // WEB, POS, MOBILE
 
-    @Column(name = "order_status")
-    private String orderStatus;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "order_status", length = 32)
+    private OrderStatus orderStatus = OrderStatus.DRAFT;
 
     @Column(name = "subtotal", precision = 10, scale = 2)
     private BigDecimal subtotal;
@@ -62,8 +63,13 @@ public class Order {
     @Column(name = "grand_total", precision = 10, scale = 2)
     private BigDecimal grandTotal;
 
-    @Column(name = "payment_status")
-    private String paymentStatus;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", length = 32)
+    private PaymentStatus paymentStatus = PaymentStatus.UNPAID;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "fulfillment_type", length = 32)
+    private FulfillmentType fulfillmentType;
 
     @Column(columnDefinition = "TEXT")
     private String note;
@@ -81,9 +87,6 @@ public class Order {
 
     @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private DeliveryAddress deliveryAddress;
-
-    @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Delivery delivery;
 
     // Utility methods for bi-directional relationships
     public void addItem(OrderItem item) {
