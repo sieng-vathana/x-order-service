@@ -3,6 +3,7 @@ package com.x.order.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -41,8 +42,15 @@ public class Order {
     @Column(name = "order_no", unique = true)
     private String orderNo;
 
-    @Column(name = "order_channel")
-    private String orderChannel; // WEB, POS, MOBILE
+    @Enumerated(EnumType.STRING)
+    @Column(name = "order_channel", nullable = false, length = 16)
+    private OrderChannel orderChannel;
+
+    @Column(name = "currency_code", nullable = false, length = 3)
+    private String currencyCode;
+
+    @Column(name = "idempotency_key", nullable = false, unique = true, length = 100)
+    private String idempotencyKey;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "order_status", length = 32)
@@ -53,6 +61,13 @@ public class Order {
 
     @Column(name = "discount", precision = 10, scale = 2)
     private BigDecimal discount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "discount_type", length = 16)
+    private DiscountType discountType;
+
+    @Column(name = "discount_value", precision = 10, scale = 2)
+    private BigDecimal discountValue;
 
     @Column(name = "tax", precision = 10, scale = 2)
     private BigDecimal tax;
@@ -78,12 +93,28 @@ public class Order {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
+    @Version
+    private Long version;
+
     // Relationships
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<OrderItem> items = new ArrayList<>();
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<OrderCoupon> coupons = new ArrayList<>();
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<OrderDiscount> discounts = new ArrayList<>();
 
     @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private DeliveryAddress deliveryAddress;
@@ -97,5 +128,10 @@ public class Order {
     public void addCoupon(OrderCoupon coupon) {
         coupons.add(coupon);
         coupon.setOrder(this);
+    }
+
+    public void addDiscount(OrderDiscount discount) {
+        discounts.add(discount);
+        discount.setOrder(this);
     }
 }

@@ -17,3 +17,24 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:x-kafka:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: x-order-service
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.x.order.event"
+
+services:
+  product:
+    base-url: ${PRODUCT_SERVICE_URL:http://x-product-service:8082}
+  inventory:
+    base-url: ${INVENTORY_SERVICE_URL:http://x-inventory-service:8085}
+  payment:
+    base-url: ${PAYMENT_SERVICE_URL:http://x-payment-service:8084}
+  delivery:
+    base-url: ${DELIVERY_SERVICE_URL:http://x-delivery-service:8080}

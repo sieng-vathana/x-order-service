@@ -4,7 +4,7 @@ spring:
       on-profile: local
     import: optional:file:../config/secrets.yml
   datasource:
-    url: jdbc:mysql://${db.host}:${db.port}/${db.dev.name}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    url: jdbc:mysql://${db.dev.host}:${db.dev.port}/${db.dev.name}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
     username: ${db.dev.username}
     password: ${db.dev.password}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -17,3 +17,22 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: x-order-service
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.x.order.event"
+
+services:
+  product:
+    base-url: http://127.0.0.1:8082
+  inventory:
+    base-url: http://127.0.0.1:8085
+  payment:
+    base-url: http://127.0.0.1:8084
