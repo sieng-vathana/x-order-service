@@ -10,7 +10,7 @@ import java.util.List;
 public record CreatePosOrderRequest(
         @NotNull @Positive Long businessId,
         @NotNull @Positive Long storeId,
-        @Positive Long customerId,
+        @PositiveOrZero Long customerId,
         @Positive Long counterId,
         @NotNull @Positive Long cashierId,
         @NotBlank @Pattern(regexp = "[A-Za-z]{3}") String currencyCode,
