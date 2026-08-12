@@ -1,7 +1,11 @@
 package com.x.order.service;
 
 import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.http.HttpHeaders;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -21,6 +25,15 @@ final class OrderServiceRestClient {
         requestFactory.setReadTimeout(READ_TIMEOUT);
         return builder.clone()
                 .requestFactory(requestFactory)
+                .requestInterceptor((request, body, execution) -> {
+                    if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes) {
+                        String authorization = attributes.getRequest().getHeader(HttpHeaders.AUTHORIZATION);
+                        if (StringUtils.hasText(authorization)) {
+                            request.getHeaders().set(HttpHeaders.AUTHORIZATION, authorization);
+                        }
+                    }
+                    return execution.execute(request, body);
+                })
                 .baseUrl(baseUrl + servicePath)
                 .build();
     }
