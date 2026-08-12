@@ -31,10 +31,10 @@ spring:
 
 services:
   product:
-    base-url: ${PRODUCT_SERVICE_URL:http://x-product-service:8082}
+    base-url: ${PRODUCT_SERVICE_URL:http://x-product-service:8080}
   inventory:
-    base-url: ${INVENTORY_SERVICE_URL:http://x-inventory-service:8085}
+    base-url: ${INVENTORY_SERVICE_URL:http://x-inventory-service:8080}
   payment:
-    base-url: ${PAYMENT_SERVICE_URL:http://x-payment-service:8084}
+    base-url: ${PAYMENT_SERVICE_URL:http://x-payment-service:8080}
   delivery:
     base-url: ${DELIVERY_SERVICE_URL:http://x-delivery-service:8080}

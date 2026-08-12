@@ -13,7 +13,7 @@ public class DeliveryQuoteClient {
 
     public DeliveryQuoteClient(RestClient.Builder builder,
                                @Value("${services.delivery.base-url:http://127.0.0.1:8090}") String baseUrl) {
-        this.client = builder.baseUrl(baseUrl + "/api/v1/deliveries").build();
+        this.client = OrderServiceRestClient.create(builder, baseUrl, "/api/v1/deliveries");
     }
 
     public DeliveryQuoteResponse getQuote(Long quoteId) {

@@ -15,7 +15,7 @@ public class PaymentClient {
 
     public PaymentClient(RestClient.Builder builder,
                          @Value("${services.payment.base-url:http://127.0.0.1:8084}") String baseUrl) {
-        this.client = builder.baseUrl(baseUrl + "/api/v1/payments").build();
+        this.client = OrderServiceRestClient.create(builder, baseUrl, "/api/v1/payments");
     }
 
     public List<PaymentSummaryResponse> listForOrder(Long orderId) {

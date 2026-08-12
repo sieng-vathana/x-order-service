@@ -15,7 +15,7 @@ public class InventoryClient {
 
     public InventoryClient(RestClient.Builder builder,
                            @Value("${services.inventory.base-url:http://127.0.0.1:8085}") String baseUrl) {
-        this.client = builder.baseUrl(baseUrl + "/api/v1/inventory").build();
+        this.client = OrderServiceRestClient.create(builder, baseUrl, "/api/v1/inventory");
     }
 
     public StockReservationResponse reserve(Long storeId, Long variantId, Long orderId, long quantity) {

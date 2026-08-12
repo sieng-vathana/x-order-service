@@ -13,7 +13,7 @@ public class ProductClient {
 
     public ProductClient(RestClient.Builder builder,
                          @Value("${services.product.base-url:http://127.0.0.1:8082}") String baseUrl) {
-        this.client = builder.baseUrl(baseUrl + "/api/v1/products").build();
+        this.client = OrderServiceRestClient.create(builder, baseUrl, "/api/v1/products");
     }
 
     public ProductVariantSaleResponse getVariant(Long variantId) {
