@@ -60,6 +60,15 @@ public class OrderPersistenceService {
         return orderRepository.save(order);
     }
 
+    @Transactional
+    public void deleteDraft(Long orderId) {
+        Order order = require(orderId);
+        if (order.getOrderStatus() != OrderStatus.DRAFT) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Held sale is no longer active");
+        }
+        orderRepository.delete(order);
+    }
+
     @Transactional(readOnly = true)
     public Order require(Long id) {
         Order order = orderRepository.findByIdWithItems(id)

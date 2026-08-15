@@ -42,16 +42,88 @@ public class OrderService {
         Order existing = persistenceService.findByIdempotencyKey(idempotencyKey).orElse(null);
         if (existing != null) return toResponse(existing);
 
+        Order order = buildPosOrder(request, OrderStatus.PENDING_PAYMENT);
+        BigDecimal taxRate = money(request.taxRate() == null ? ZERO : request.taxRate());
+        Order saved = hasText(request.discountCode())
+                ? discountService.applyCodeAndSave(order, request.discountCode(), taxRate)
+                : persistenceService.save(order);
+
+        List<Long> reservations = new ArrayList<>();
+        try {
+            for (OrderItem item : saved.getItems()) {
+                StockReservationResponse reservation = inventoryClient.reserve(
+                        saved.getStoreId(), item.getVariantId(), saved.getId(), item.getQty());
+                reservations.add(reservation.id());
+                saved = persistenceService.attachReservation(saved.getId(), item.getId(), reservation.id());
+            }
+            publishOrderCreated(saved);
+            return toResponse(saved);
+        } catch (RuntimeException exception) {
+            reservations.forEach(this::releaseQuietly);
+            persistenceService.markCancelled(saved.getId());
+            discountService.release(saved.getId());
+            throw exception;
+        }
+    }
+
+    public OrderResponse createHeld(CreateHeldPosOrderRequest request) {
+        String idempotencyKey = request.idempotencyKey().trim();
+        Order existing = persistenceService.findByIdempotencyKey(idempotencyKey).orElse(null);
+        if (existing != null) {
+            if (existing.getOrderChannel() != OrderChannel.POS || existing.getOrderStatus() != OrderStatus.DRAFT) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Hold idempotency key has already been used");
+            }
+            return toResponse(existing);
+        }
+
+        CreatePosOrderRequest posRequest = new CreatePosOrderRequest(
+                request.businessId(), request.storeId(), request.customerId(), request.counterId(), request.cashierId(),
+                request.currencyCode(), null, null, null, null, request.taxRate(), request.note(),
+                request.idempotencyKey(), request.items());
+        return toResponse(persistenceService.save(buildPosOrder(posRequest, OrderStatus.DRAFT)));
+    }
+
+    @Transactional(readOnly = true)
+    public Page<OrderResponse> listHeld(Long storeId, int page, int size) {
+        return orderRepository.findByStoreIdAndOrderChannelAndOrderStatus(
+                storeId, OrderChannel.POS, OrderStatus.DRAFT,
+                PageRequest.of(page, size, Sort.by("createdAt").descending())).map(this::toResponse);
+    }
+
+    public OrderResponse resumeHeld(Long id) {
+        Order held = requireHeld(id);
+        OrderResponse response = toResponse(held);
+        persistenceService.deleteDraft(id);
+        return response;
+    }
+
+    public OrderResponse discardHeld(Long id) {
+        Order held = requireHeld(id);
+        OrderResponse response = toResponse(held);
+        persistenceService.deleteDraft(id);
+        return response;
+    }
+
+    private Order requireHeld(Long id) {
+        Order order = persistenceService.require(id);
+        if (order.getOrderChannel() != OrderChannel.POS || order.getOrderStatus() != OrderStatus.DRAFT) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Held sale is no longer active");
+        }
+        return order;
+    }
+
+    private Order buildPosOrder(CreatePosOrderRequest request, OrderStatus status) {
         validateDiscountRequest(request);
         String currency = normalizeCurrency(request.currencyCode());
         BigDecimal taxRate = money(request.taxRate() == null ? ZERO : request.taxRate());
+        String prefix = status == OrderStatus.DRAFT ? "HOLD-" : "POS-";
         Order order = Order.builder()
                 .businessId(request.businessId()).storeId(request.storeId()).customerId(request.customerId())
                 .counterId(request.counterId()).cashierId(request.cashierId())
-                .orderNo("POS-" + UUID.randomUUID().toString().substring(0, 12).toUpperCase(Locale.ROOT))
-                .orderChannel(OrderChannel.POS).orderStatus(OrderStatus.PENDING_PAYMENT)
+                .orderNo(prefix + UUID.randomUUID().toString().substring(0, 12).toUpperCase(Locale.ROOT))
+                .orderChannel(OrderChannel.POS).orderStatus(status)
                 .paymentStatus(PaymentStatus.UNPAID).currencyCode(currency)
-                .idempotencyKey(idempotencyKey).discountType(request.discountType())
+                .idempotencyKey(request.idempotencyKey().trim()).discountType(request.discountType())
                 .discountValue(money(request.discountValue() == null ? ZERO : request.discountValue()))
                 .deliveryFee(ZERO).note(request.note()).items(new ArrayList<>()).coupons(new ArrayList<>()).build();
 
@@ -112,26 +184,7 @@ public class OrderService {
                     .appliedBy(request.cashierId())
                     .build());
         }
-        Order saved = hasText(request.discountCode())
-                ? discountService.applyCodeAndSave(order, request.discountCode(), taxRate)
-                : persistenceService.save(order);
-
-        List<Long> reservations = new ArrayList<>();
-        try {
-            for (OrderItem item : saved.getItems()) {
-                StockReservationResponse reservation = inventoryClient.reserve(
-                        saved.getStoreId(), item.getVariantId(), saved.getId(), item.getQty());
-                reservations.add(reservation.id());
-                saved = persistenceService.attachReservation(saved.getId(), item.getId(), reservation.id());
-            }
-            publishOrderCreated(saved);
-            return toResponse(saved);
-        } catch (RuntimeException exception) {
-            reservations.forEach(this::releaseQuietly);
-            persistenceService.markCancelled(saved.getId());
-            discountService.release(saved.getId());
-            throw exception;
-        }
+        return order;
     }
 
     public OrderResponse createOnline(CreateOnlineOrderRequest request) {
@@ -261,8 +314,9 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public Page<OrderResponse> list(Long storeId, int page, int size) {
-        return orderRepository.findByStoreId(
-                storeId, PageRequest.of(page, size, Sort.by("createdAt").descending())).map(this::toResponse);
+        return orderRepository.findByStoreIdAndOrderStatusNot(
+                storeId, OrderStatus.DRAFT,
+                PageRequest.of(page, size, Sort.by("createdAt").descending())).map(this::toResponse);
     }
 
     @Transactional(readOnly = true)

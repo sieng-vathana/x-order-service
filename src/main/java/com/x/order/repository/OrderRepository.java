@@ -1,6 +1,7 @@
 package com.x.order.repository;
 
 import com.x.order.entity.Order;
+import com.x.order.entity.OrderChannel;
 import com.x.order.entity.OrderStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,6 +18,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @EntityGraph(attributePaths = "items")
     Optional<Order> findByIdempotencyKey(String idempotencyKey);
     Page<Order> findByStoreId(Long storeId, Pageable pageable);
+
+    @EntityGraph(attributePaths = "items")
+    Page<Order> findByStoreIdAndOrderChannelAndOrderStatus(
+            Long storeId, OrderChannel orderChannel, OrderStatus orderStatus, Pageable pageable);
+
+    @EntityGraph(attributePaths = "items")
+    Page<Order> findByStoreIdAndOrderStatusNot(Long storeId, OrderStatus orderStatus, Pageable pageable);
 
     @Query("select distinct o from Order o left join fetch o.items where o.id = :id")
     Optional<Order> findByIdWithItems(@Param("id") Long id);

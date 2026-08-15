@@ -29,6 +29,34 @@ public class OrderController {
                 .body(ApiResponse.success(201, "POS order created", orderService.createPos(request)));
     }
 
+    @PostMapping("/holds")
+    public ResponseEntity<ApiResponse<OrderResponse>> createHeld(
+            @Valid @RequestBody CreateHeldPosOrderRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(201, "POS sale held", orderService.createHeld(request)));
+    }
+
+    @GetMapping("/holds")
+    public ResponseEntity<ApiResponse<PageResponse<OrderResponse>>> listHeld(
+            @RequestParam @Positive Long storeId,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "50") @Min(1) @Max(100) int size) {
+        Page<OrderResponse> result = orderService.listHeld(storeId, page, size);
+        return ResponseEntity.ok(ApiResponse.success(200, new PageResponse<>(
+                result.getContent(), result.getNumber(), result.getSize(), result.getTotalElements(),
+                result.getTotalPages(), result.hasNext())));
+    }
+
+    @PostMapping("/holds/{id}/resume")
+    public ResponseEntity<ApiResponse<OrderResponse>> resumeHeld(@PathVariable @Positive Long id) {
+        return ResponseEntity.ok(ApiResponse.success(200, "Held sale resumed", orderService.resumeHeld(id)));
+    }
+
+    @PostMapping("/holds/{id}/discard")
+    public ResponseEntity<ApiResponse<OrderResponse>> discardHeld(@PathVariable @Positive Long id) {
+        return ResponseEntity.ok(ApiResponse.success(200, "Held sale discarded", orderService.discardHeld(id)));
+    }
+
     @PostMapping("/online")
     public ResponseEntity<ApiResponse<OrderResponse>> createOnline(@Valid @RequestBody CreateOnlineOrderRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
