@@ -130,7 +130,8 @@ public class OrderService {
         BigDecimal subtotal = ZERO;
         BigDecimal lineDiscounts = ZERO;
         for (PosOrderItemRequest requestedItem : request.items()) {
-            ProductVariantSaleResponse variant = productClient.getVariant(requestedItem.variantId());
+            ProductVariantSaleResponse variant = productClient.getVariant(
+                    requestedItem.variantId(), request.storeId());
             validateVariant(request, currency, variant);
             BigDecimal base = money(variant.posPrice().multiply(BigDecimal.valueOf(requestedItem.quantity())));
             BigDecimal discount = discount(
@@ -209,7 +210,8 @@ public class OrderService {
 
         BigDecimal subtotal = ZERO;
         for (OnlineOrderItemRequest requestedItem : request.items()) {
-            ProductVariantSaleResponse variant = productClient.getVariant(requestedItem.variantId());
+            ProductVariantSaleResponse variant = productClient.getVariant(
+                    requestedItem.variantId(), request.storeId());
             validateOnlineVariant(request, currency, variant);
             BigDecimal base = money(variant.onlinePrice().multiply(BigDecimal.valueOf(requestedItem.quantity())));
             BigDecimal tax = money(base.multiply(taxRate).divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP));

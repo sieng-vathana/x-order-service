@@ -16,8 +16,11 @@ public class ProductClient {
         this.client = OrderServiceRestClient.create(builder, baseUrl, "/api/v1/products");
     }
 
-    public ProductVariantSaleResponse getVariant(Long variantId) {
-        ApiResponse<ProductVariantSaleResponse> response = client.get().uri("/variants/{id}", variantId)
+    public ProductVariantSaleResponse getVariant(Long variantId, Long storeId) {
+        ApiResponse<ProductVariantSaleResponse> response = client.get()
+                .uri(uriBuilder -> uriBuilder.path("/variants/{id}")
+                        .queryParam("storeId", storeId)
+                        .build(variantId))
                 .retrieve().body(new ParameterizedTypeReference<>() {});
         if (response == null || response.getData() == null) {
             throw new IllegalStateException("Product service returned no variant");
