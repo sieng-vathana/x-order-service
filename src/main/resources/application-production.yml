@@ -30,6 +30,8 @@ spring:
         spring.json.trusted.packages: "com.x.order.event"
 
 services:
+  business:
+    base-url: ${BUSINESS_SERVICE_URL:http://x-business-service:8080}
   product:
     base-url: ${PRODUCT_SERVICE_URL:http://x-product-service:8080}
   inventory:

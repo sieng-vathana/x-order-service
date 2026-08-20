@@ -22,10 +22,16 @@ public class InventoryClient {
     }
 
     public StockReservationResponse reserve(Long storeId, Long variantId, Long orderId, long quantity) {
-        record Request(Long storeId, Long variantId, Long orderId, long quantity, LocalDateTime expiresAt) {}
+        return reserve(storeId, variantId, orderId, quantity, false);
+    }
+
+    public StockReservationResponse reserve(
+            Long storeId, Long variantId, Long orderId, long quantity, boolean allowNegativeStock) {
+        record Request(Long storeId, Long variantId, Long orderId, long quantity,
+                       LocalDateTime expiresAt, boolean allowNegativeStock) {}
         try {
             ApiResponse<StockReservationResponse> response = client.post().uri("/reservations/with-details")
-                    .body(new Request(storeId, variantId, orderId, quantity, LocalDateTime.now().plusMinutes(15)))
+                    .body(new Request(storeId, variantId, orderId, quantity, LocalDateTime.now().plusMinutes(15), allowNegativeStock))
                     .retrieve().body(new ParameterizedTypeReference<>() {});
             if (response == null || response.getData() == null) {
                 throw new IllegalStateException("Inventory service returned no reservation");

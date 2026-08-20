@@ -29,6 +29,7 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final OrderPersistenceService persistenceService;
     private final ProductClient productClient;
+    private final BusinessClient businessClient;
     private final InventoryClient inventoryClient;
     private final PaymentClient paymentClient;
     private final DiscountService discountService;
@@ -52,7 +53,8 @@ public class OrderService {
         try {
             for (OrderItem item : saved.getItems()) {
                 StockReservationResponse reservation = inventoryClient.reserve(
-                        saved.getStoreId(), item.getVariantId(), saved.getId(), item.getQty());
+                        saved.getStoreId(), item.getVariantId(), saved.getId(), item.getQty(),
+                        Boolean.TRUE.equals(request.allowNegativeStock()));
                 reservations.add(reservation.id());
                 saved = persistenceService.attachReservation(saved.getId(), item.getId(), reservation.id());
             }
@@ -79,7 +81,7 @@ public class OrderService {
         CreatePosOrderRequest posRequest = new CreatePosOrderRequest(
                 request.businessId(), request.storeId(), request.customerId(), request.counterId(), request.cashierId(),
                 request.currencyCode(), null, null, null, null, request.taxRate(), request.note(),
-                request.idempotencyKey(), request.items());
+                request.idempotencyKey(), request.items(), request.roundingIncrement(), request.allowNegativeStock());
         return toResponse(persistenceService.save(buildPosOrder(posRequest, OrderStatus.DRAFT)));
     }
 
@@ -129,11 +131,16 @@ public class OrderService {
 
         BigDecimal subtotal = ZERO;
         BigDecimal lineDiscounts = ZERO;
+        BigDecimal usdToKhrRate = null;
         for (PosOrderItemRequest requestedItem : request.items()) {
             ProductVariantSaleResponse variant = productClient.getVariant(
                     requestedItem.variantId(), request.storeId());
             validateVariant(request, currency, variant);
-            BigDecimal base = money(variant.posPrice().multiply(BigDecimal.valueOf(requestedItem.quantity())));
+            if (!currency.equalsIgnoreCase(variant.currencyCode()) && usdToKhrRate == null) {
+                usdToKhrRate = resolveUsdToKhrRate(request.businessId());
+            }
+            BigDecimal unitPrice = convertCatalogPrice(variant.posPrice(), variant.currencyCode(), currency, usdToKhrRate);
+            BigDecimal base = money(unitPrice.multiply(BigDecimal.valueOf(requestedItem.quantity())));
             BigDecimal discount = discount(
                     requestedItem.discountType(), itemDiscountValue(requestedItem), base);
             BigDecimal lineTax = money(base.subtract(discount).multiply(taxRate)
@@ -142,7 +149,7 @@ public class OrderService {
                     .productId(variant.productId()).variantId(variant.variantId())
                     .productName(variant.productName()).variantName(variant.variantName())
                     .sku(variant.sku()).barcode(variant.barcode()).qty(requestedItem.quantity())
-                    .unitPrice(money(variant.posPrice())).discountType(requestedItem.discountType())
+                     .unitPrice(unitPrice).discountType(requestedItem.discountType())
                     .discountValue(money(requestedItem.discountValue() == null ? ZERO : requestedItem.discountValue()))
                     .discountAmount(discount).orderDiscountAmount(ZERO).taxAmount(lineTax)
                     .total(money(base.subtract(discount).add(lineTax))).build());
@@ -171,7 +178,7 @@ public class OrderService {
         order.setSubtotal(money(subtotal));
         order.setDiscount(totalDiscount);
         order.setTax(tax);
-        order.setGrandTotal(money(subtotal.subtract(totalDiscount).add(tax)));
+        order.setGrandTotal(roundTotal(subtotal.subtract(totalDiscount).add(tax), request.roundingIncrement()));
         if (orderDiscount.signum() > 0) {
             order.addDiscount(OrderDiscount.builder()
                     .name("Manual order discount")
@@ -342,9 +349,16 @@ public class OrderService {
         if (!request.storeId().equals(variant.storeId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product variant belongs to another store");
         }
-        if (!currency.equalsIgnoreCase(variant.currencyCode()) || variant.posPrice() == null
+        if (variant.posPrice() == null || variant.currencyCode() == null
                 || Integer.valueOf(2).equals(variant.salesChannel())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product variant is unavailable for this POS order");
+        }
+        String catalogCurrency = normalizeCurrency(variant.currencyCode());
+        if (!currency.equalsIgnoreCase(catalogCurrency)
+                && !("USD".equals(catalogCurrency) && "KHR".equalsIgnoreCase(currency))
+                && !("KHR".equals(catalogCurrency) && "USD".equalsIgnoreCase(currency))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Product currency " + catalogCurrency + " cannot be converted to " + currency);
         }
     }
 
@@ -525,6 +539,39 @@ public class OrderService {
         catch (IllegalArgumentException exception) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid ISO 4217 currency code");
         }
+    }
+
+    private BigDecimal resolveUsdToKhrRate(Long businessId) {
+        BigDecimal rate = businessClient.getCurrencySettings(businessId).usdToKhrExchangeRate();
+        if (rate == null || rate.signum() <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "The business USD to KHR exchange rate is not configured");
+        }
+        return rate;
+    }
+
+    private BigDecimal convertCatalogPrice(
+            BigDecimal price, String catalogCurrency, String targetCurrency, BigDecimal usdToKhrRate) {
+        String source = normalizeCurrency(catalogCurrency);
+        if (source.equalsIgnoreCase(targetCurrency)) return money(price);
+        if (usdToKhrRate == null || usdToKhrRate.signum() <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "The business USD to KHR exchange rate is not configured");
+        }
+        if ("USD".equals(source) && "KHR".equalsIgnoreCase(targetCurrency)) {
+            return money(price.multiply(usdToKhrRate));
+        }
+        if ("KHR".equals(source) && "USD".equalsIgnoreCase(targetCurrency)) {
+            return money(price.divide(usdToKhrRate, 8, RoundingMode.HALF_UP));
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Product currency " + source + " cannot be converted to " + targetCurrency);
+    }
+
+    private BigDecimal roundTotal(BigDecimal amount, Integer increment) {
+        if (increment == null || increment <= 0) return money(amount);
+        BigDecimal unit = BigDecimal.valueOf(increment);
+        return money(amount.divide(unit, 0, RoundingMode.HALF_UP).multiply(unit));
     }
     private BigDecimal money(BigDecimal value) { return value.setScale(2, RoundingMode.HALF_UP); }
     private void releaseQuietly(Long id) { try { inventoryClient.release(id); } catch (RuntimeException ignored) { } }
