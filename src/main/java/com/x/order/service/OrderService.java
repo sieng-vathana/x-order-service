@@ -345,6 +345,14 @@ public class OrderService {
                         row.getQuantity(), row.getSalesAmount())).toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<SalesTrendResponse> salesTrend(Long storeId, LocalDateTime from, LocalDateTime to) {
+        validateRange(from, to);
+        return orderRepository.salesTrend(storeId, OrderStatus.COMPLETED.name(), from, to)
+                .stream().map(row -> new SalesTrendResponse(
+                        row.getSalesDate().toLocalDate(), row.getOrderCount(), row.getGrandTotal())).toList();
+    }
+
     private void validateVariant(CreatePosOrderRequest request, String currency, ProductVariantSaleResponse variant) {
         if (!request.storeId().equals(variant.storeId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product variant belongs to another store");

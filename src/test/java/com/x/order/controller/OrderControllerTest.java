@@ -3,6 +3,7 @@ package com.x.order.controller;
 import com.x.order.dto.CreateHeldPosOrderRequest;
 import com.x.order.dto.OrderResponse;
 import com.x.order.dto.PosOrderItemRequest;
+import com.x.order.dto.SalesTrendResponse;
 import com.x.order.service.OrderService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,6 +13,8 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -53,5 +56,21 @@ class OrderControllerTest {
         assertThat(response.getBody().getStatus()).isEqualTo(1);
         assertThat(response.getBody().getCode()).isEqualTo(200);
         assertThat(response.getBody().getData().content()).isEmpty();
+    }
+
+    @Test
+    void salesTrendUsesSharedApiResponseEnvelope() {
+        OrderController controller = new OrderController(orderService);
+        when(orderService.salesTrend(2L, LocalDateTime.of(2026, 8, 15, 0, 0), LocalDateTime.of(2026, 8, 22, 0, 0)))
+                .thenReturn(List.of(new SalesTrendResponse(LocalDate.of(2026, 8, 20), 3, new BigDecimal("42.00"))));
+
+        var response = controller.salesTrend(2L,
+                LocalDateTime.of(2026, 8, 15, 0, 0), LocalDateTime.of(2026, 8, 22, 0, 0));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getStatus()).isEqualTo(1);
+        assertThat(response.getBody().getData()).hasSize(1);
+        assertThat(response.getBody().getData().get(0).date()).isEqualTo(LocalDate.of(2026, 8, 20));
     }
 }

@@ -111,4 +111,12 @@ public class OrderController {
             @RequestParam(defaultValue = "10") @Min(1) @Max(100) int limit) {
         return ResponseEntity.ok(ApiResponse.success(200, orderService.topProducts(storeId, from, to, limit)));
     }
+
+    @GetMapping("/reports/sales-trend")
+    public ResponseEntity<ApiResponse<List<SalesTrendResponse>>> salesTrend(
+            @RequestParam @Positive Long storeId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+        return ResponseEntity.ok(ApiResponse.success(200, orderService.salesTrend(storeId, from, to)));
+    }
 }

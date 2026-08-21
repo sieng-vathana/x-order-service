@@ -56,4 +56,18 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             @Param("storeId") Long storeId, @Param("status") OrderStatus status,
             @Param("from") LocalDateTime from, @Param("to") LocalDateTime to,
             Pageable pageable);
+
+    @Query(value = """
+            select date(o.completed_at) as salesDate,
+                   count(o.id) as orderCount,
+                   coalesce(sum(o.grand_total), 0) as grandTotal
+              from orders o
+             where o.store_id = :storeId and o.order_status = :status
+               and o.completed_at >= :from and o.completed_at < :to
+             group by date(o.completed_at)
+             order by date(o.completed_at)
+            """, nativeQuery = true)
+    List<SalesTrendProjection> salesTrend(
+            @Param("storeId") Long storeId, @Param("status") String status,
+            @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 }
