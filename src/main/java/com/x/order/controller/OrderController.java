@@ -3,6 +3,9 @@ package com.x.order.controller;
 import com.sharedlib.response.ApiResponse;
 import com.sharedlib.response.PageResponse;
 import com.x.order.dto.*;
+import com.x.order.entity.FulfillmentType;
+import com.x.order.entity.OrderChannel;
+import com.x.order.entity.OrderStatus;
 import com.x.order.service.OrderService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
@@ -69,6 +72,24 @@ public class OrderController {
                 "Online order confirmed", orderService.confirmOnline(id)));
     }
 
+    @PostMapping("/{id}/pack")
+    public ResponseEntity<ApiResponse<OrderResponse>> pack(@PathVariable @Positive Long id) {
+        return ResponseEntity.ok(ApiResponse.success(HttpStatus.OK.value(),
+                "Order marked as packing", orderService.pack(id)));
+    }
+
+    @PostMapping("/{id}/ship")
+    public ResponseEntity<ApiResponse<OrderResponse>> ship(@PathVariable @Positive Long id) {
+        return ResponseEntity.ok(ApiResponse.success(HttpStatus.OK.value(),
+                "Order marked as shipped", orderService.ship(id)));
+    }
+
+    @PostMapping("/{id}/deliver")
+    public ResponseEntity<ApiResponse<OrderResponse>> deliver(@PathVariable @Positive Long id) {
+        return ResponseEntity.ok(ApiResponse.success(HttpStatus.OK.value(),
+                "Order marked as delivered", orderService.deliver(id)));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<OrderResponse>> get(@PathVariable @Positive Long id) {
         return ResponseEntity.ok(ApiResponse.success(200, orderService.get(id)));
@@ -77,9 +98,13 @@ public class OrderController {
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<OrderResponse>>> list(
             @RequestParam @Positive Long storeId,
+            @RequestParam(required = false) OrderChannel channel,
+            @RequestParam(required = false) OrderStatus status,
+            @RequestParam(required = false) FulfillmentType fulfillmentType,
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        Page<OrderResponse> result = orderService.list(storeId, page, size);
+        Page<OrderResponse> result = orderService.list(storeId, channel, status, fulfillmentType, search, page, size);
         return ResponseEntity.ok(ApiResponse.success(200, new PageResponse<>(
                 result.getContent(), result.getNumber(), result.getSize(), result.getTotalElements(),
                 result.getTotalPages(), result.hasNext())));
@@ -87,7 +112,7 @@ public class OrderController {
 
     @PostMapping("/{id}/complete")
     public ResponseEntity<ApiResponse<OrderResponse>> complete(@PathVariable @Positive Long id) {
-        return ResponseEntity.ok(ApiResponse.success(200, "POS order completed", orderService.complete(id)));
+        return ResponseEntity.ok(ApiResponse.success(200, "Order completed", orderService.complete(id)));
     }
 
     @PostMapping("/{id}/cancel")

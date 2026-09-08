@@ -12,6 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -260,22 +262,39 @@ public class OrderService {
         return toResponse(persistenceService.confirmOnline(id));
     }
 
+    public OrderResponse pack(Long id) {
+        return toResponse(persistenceService.markPacking(id));
+    }
+
+    public OrderResponse ship(Long id) {
+        return toResponse(persistenceService.markShipped(id));
+    }
+
+    public OrderResponse deliver(Long id) {
+        return toResponse(persistenceService.markDelivered(id));
+    }
+
     public OrderResponse complete(Long id) {
         Order order = persistenceService.require(id);
         if (order.getOrderStatus() == OrderStatus.COMPLETED) {
             discountService.redeem(id);
             return toResponse(order);
         }
-        if (order.getOrderStatus() != OrderStatus.PENDING_PAYMENT) {
+        if (order.getOrderStatus() == OrderStatus.CANCELLED || order.getOrderStatus() == OrderStatus.DRAFT) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Order cannot be completed from status " + order.getOrderStatus());
+        }
+        if (order.getOrderChannel() == OrderChannel.POS && order.getOrderStatus() != OrderStatus.PENDING_PAYMENT) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Order is not awaiting payment");
         }
-        BigDecimal paid = paymentClient.listForOrder(id).stream()
-                .filter(payment -> "PAID".equals(payment.status()) || "PARTIALLY_REFUNDED".equals(payment.status()))
-                .map(payment -> payment.amount().subtract(
-                        payment.refundedAmount() == null ? ZERO : payment.refundedAmount()))
-                .reduce(ZERO, BigDecimal::add);
-        if (paid.compareTo(order.getGrandTotal()) < 0) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Order payment is incomplete");
+        if (order.getPaymentStatus() != PaymentStatus.COD_PENDING) {
+            BigDecimal paid = paymentClient.listForOrder(id).stream()
+                    .filter(payment -> "PAID".equals(payment.status()) || "PARTIALLY_REFUNDED".equals(payment.status()))
+                    .map(payment -> payment.amount().subtract(
+                            payment.refundedAmount() == null ? ZERO : payment.refundedAmount()))
+                    .reduce(ZERO, BigDecimal::add);
+            if (paid.compareTo(order.getGrandTotal()) < 0) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Order payment is incomplete");
+            }
         }
         List<Long> consumedReservations = new ArrayList<>();
         try {
@@ -323,9 +342,35 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public Page<OrderResponse> list(Long storeId, int page, int size) {
-        return orderRepository.findByStoreIdAndOrderStatusNot(
-                storeId, OrderStatus.DRAFT,
-                PageRequest.of(page, size, Sort.by("createdAt").descending())).map(this::toResponse);
+        return list(storeId, null, null, null, null, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<OrderResponse> list(Long storeId, OrderChannel channel, OrderStatus status,
+                                    FulfillmentType fulfillmentType, String search, int page, int size) {
+        Specification<Order> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(root.get("storeId"), storeId));
+            if (status != null) {
+                predicates.add(cb.equal(root.get("orderStatus"), status));
+            } else {
+                predicates.add(cb.notEqual(root.get("orderStatus"), OrderStatus.DRAFT));
+            }
+            if (channel != null) {
+                predicates.add(cb.equal(root.get("orderChannel"), channel));
+            }
+            if (fulfillmentType != null) {
+                predicates.add(cb.equal(root.get("fulfillmentType"), fulfillmentType));
+            }
+            if (search != null && !search.trim().isEmpty()) {
+                String pattern = "%" + search.trim().toLowerCase(Locale.ROOT) + "%";
+                Predicate orderNoLike = cb.like(cb.lower(root.get("orderNo")), pattern);
+                predicates.add(orderNoLike);
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+        return orderRepository.findAll(spec, PageRequest.of(page, size, Sort.by("createdAt").descending()))
+                .map(this::toResponse);
     }
 
     @Transactional(readOnly = true)

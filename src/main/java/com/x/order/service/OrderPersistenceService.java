@@ -51,6 +51,36 @@ public class OrderPersistenceService {
     }
 
     @Transactional
+    public Order markPacking(Long orderId) {
+        Order order = require(orderId);
+        if (order.getOrderStatus() != OrderStatus.CONFIRMED && order.getOrderStatus() != OrderStatus.PENDING_CONFIRMATION) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Order cannot be marked packing from status " + order.getOrderStatus());
+        }
+        order.setOrderStatus(OrderStatus.PACKING);
+        return orderRepository.save(order);
+    }
+
+    @Transactional
+    public Order markShipped(Long orderId) {
+        Order order = require(orderId);
+        if (order.getOrderStatus() != OrderStatus.PACKING && order.getOrderStatus() != OrderStatus.CONFIRMED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Order cannot be marked shipped from status " + order.getOrderStatus());
+        }
+        order.setOrderStatus(OrderStatus.SHIPPED);
+        return orderRepository.save(order);
+    }
+
+    @Transactional
+    public Order markDelivered(Long orderId) {
+        Order order = require(orderId);
+        if (order.getOrderStatus() != OrderStatus.SHIPPED && order.getOrderStatus() != OrderStatus.PACKING && order.getOrderStatus() != OrderStatus.CONFIRMED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Order cannot be marked delivered from status " + order.getOrderStatus());
+        }
+        order.setOrderStatus(OrderStatus.DELIVERED);
+        return orderRepository.save(order);
+    }
+
+    @Transactional
     public Order markCancelled(Long orderId) {
         Order order = require(orderId);
         if (order.getOrderStatus() == OrderStatus.COMPLETED) {
