@@ -374,26 +374,26 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public SalesSummaryResponse salesSummary(Long storeId, LocalDateTime from, LocalDateTime to) {
+    public SalesSummaryResponse salesSummary(Long storeId, String currencyCode, LocalDateTime from, LocalDateTime to) {
         validateRange(from, to);
-        var row = orderRepository.salesSummary(storeId, OrderStatus.COMPLETED, from, to);
+        var row = orderRepository.salesSummary(storeId, OrderStatus.COMPLETED, normalizeCurrency(currencyCode), from, to);
         return new SalesSummaryResponse(row.getOrderCount(), row.getSubtotal(), row.getDiscount(),
                 row.getTax(), row.getGrandTotal());
     }
 
     @Transactional(readOnly = true)
-    public List<TopProductResponse> topProducts(Long storeId, LocalDateTime from, LocalDateTime to, int limit) {
+    public List<TopProductResponse> topProducts(Long storeId, String currencyCode, LocalDateTime from, LocalDateTime to, int limit) {
         validateRange(from, to);
-        return orderRepository.topProducts(storeId, OrderStatus.COMPLETED, from, to, PageRequest.of(0, limit))
+        return orderRepository.topProducts(storeId, OrderStatus.COMPLETED, normalizeCurrency(currencyCode), from, to, PageRequest.of(0, limit))
                 .stream().map(row -> new TopProductResponse(
                         row.getVariantId(), row.getProductName(), row.getSku(),
                         row.getQuantity(), row.getSalesAmount())).toList();
     }
 
     @Transactional(readOnly = true)
-    public List<SalesTrendResponse> salesTrend(Long storeId, LocalDateTime from, LocalDateTime to) {
+    public List<SalesTrendResponse> salesTrend(Long storeId, String currencyCode, LocalDateTime from, LocalDateTime to) {
         validateRange(from, to);
-        return orderRepository.salesTrend(storeId, OrderStatus.COMPLETED.name(), from, to)
+        return orderRepository.salesTrend(storeId, OrderStatus.COMPLETED.name(), normalizeCurrency(currencyCode), from, to)
                 .stream().map(row -> new SalesTrendResponse(
                         row.getSalesDate().toLocalDate(), row.getOrderCount(), row.getGrandTotal())).toList();
     }

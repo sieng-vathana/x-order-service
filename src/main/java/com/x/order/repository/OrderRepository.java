@@ -38,10 +38,12 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
                    coalesce(sum(o.grandTotal), 0) as grandTotal
               from Order o
              where o.storeId = :storeId and o.orderStatus = :status
+               and o.currencyCode = :currencyCode
                and o.completedAt >= :from and o.completedAt < :to
             """)
     SalesSummaryProjection salesSummary(
             @Param("storeId") Long storeId, @Param("status") OrderStatus status,
+            @Param("currencyCode") String currencyCode,
             @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
     @Query("""
@@ -49,12 +51,14 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
                    sum(i.qty) as quantity, sum(i.total) as salesAmount
               from OrderItem i
              where i.order.storeId = :storeId and i.order.orderStatus = :status
+               and i.order.currencyCode = :currencyCode
                and i.order.completedAt >= :from and i.order.completedAt < :to
              group by i.variantId, i.productName, i.sku
              order by sum(i.qty) desc
             """)
     List<TopProductProjection> topProducts(
             @Param("storeId") Long storeId, @Param("status") OrderStatus status,
+            @Param("currencyCode") String currencyCode,
             @Param("from") LocalDateTime from, @Param("to") LocalDateTime to,
             Pageable pageable);
 
@@ -64,11 +68,13 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
                    coalesce(sum(o.grand_total), 0) as grandTotal
               from orders o
              where o.store_id = :storeId and o.order_status = :status
+               and o.currency_code = :currencyCode
                and o.completed_at >= :from and o.completed_at < :to
              group by date(o.completed_at)
              order by date(o.completed_at)
             """, nativeQuery = true)
     List<SalesTrendProjection> salesTrend(
             @Param("storeId") Long storeId, @Param("status") String status,
+            @Param("currencyCode") String currencyCode,
             @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 }
