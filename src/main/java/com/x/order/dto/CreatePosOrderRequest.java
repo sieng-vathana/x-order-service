@@ -23,7 +23,9 @@ public record CreatePosOrderRequest(
         @NotBlank @Size(max = 100) String idempotencyKey,
         @NotEmpty List<@Valid PosOrderItemRequest> items,
         @Min(0) @Max(100) Integer roundingIncrement,
-        Boolean allowNegativeStock) {
+        Boolean allowNegativeStock,
+        /** Points the selected customer spends as an order discount; checked with the customer service. */
+        @PositiveOrZero Long loyaltyPointsToRedeem) {
 
     public CreatePosOrderRequest(
             Long businessId, Long storeId, Long customerId, Long counterId, Long cashierId,
@@ -31,6 +33,6 @@ public record CreatePosOrderRequest(
             String discountCode, BigDecimal taxRate, String note, String idempotencyKey,
             List<PosOrderItemRequest> items) {
         this(businessId, storeId, customerId, counterId, cashierId, currencyCode, discountType, discountValue,
-                discountReason, discountCode, taxRate, note, idempotencyKey, items, null, false);
+                discountReason, discountCode, taxRate, note, idempotencyKey, items, null, false, null);
     }
 }

@@ -31,6 +31,13 @@ public class OrderPersistenceService {
     }
 
     @Transactional
+    public Order recordLoyaltyEarned(Long orderId, long earnedPoints) {
+        Order order = require(orderId);
+        order.setLoyaltyPointsEarned(earnedPoints);
+        return orderRepository.save(order);
+    }
+
+    @Transactional
     public Order markCompleted(Long orderId) {
         Order order = require(orderId);
         order.setPaymentStatus(PaymentStatus.PAID);

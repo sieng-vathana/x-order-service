@@ -36,6 +36,8 @@ services:
     base-url: ${PRODUCT_SERVICE_URL:http://x-product-service:8080}
   inventory:
     base-url: ${INVENTORY_SERVICE_URL:http://x-inventory-service:8080}
+  customer:
+    base-url: ${CUSTOMER_SERVICE_URL:http://x-customer-service:8080}
   payment:
     base-url: ${PAYMENT_SERVICE_URL:http://x-payment-service:8080}
   delivery:

@@ -9,6 +9,9 @@ spring:
     name: x-order-service
   profiles:
     default: local
+  flyway:
+    # DatabaseMigrations runs Flyway after Hibernate has created the tables.
+    enabled: false
 
 x:
   http:

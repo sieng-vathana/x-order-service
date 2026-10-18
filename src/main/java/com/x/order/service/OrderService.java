@@ -8,6 +8,7 @@ import com.x.order.event.OrderCompletedEvent;
 import com.x.order.event.OrderCreatedEvent;
 import com.x.order.messaging.OrderEventProducer;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -24,6 +25,7 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderService {
@@ -36,6 +38,7 @@ public class OrderService {
     private final PaymentClient paymentClient;
     private final DiscountService discountService;
     private final DeliveryQuoteClient deliveryQuoteClient;
+    private final LoyaltyClient loyaltyClient;
 
     @Autowired(required = false)
     private OrderEventProducer orderEventProducer;
@@ -83,7 +86,7 @@ public class OrderService {
         CreatePosOrderRequest posRequest = new CreatePosOrderRequest(
                 request.businessId(), request.storeId(), request.customerId(), request.counterId(), request.cashierId(),
                 request.currencyCode(), null, null, null, null, request.taxRate(), request.note(),
-                request.idempotencyKey(), request.items(), request.roundingIncrement(), request.allowNegativeStock());
+                request.idempotencyKey(), request.items(), request.roundingIncrement(), request.allowNegativeStock(), null);
         return toResponse(persistenceService.save(buildPosOrder(posRequest, OrderStatus.DRAFT)));
     }
 
@@ -173,8 +176,13 @@ public class OrderService {
         }
         BigDecimal afterLineDiscount = subtotal.subtract(lineDiscounts);
         BigDecimal orderDiscount = discount(request.discountType(), request.discountValue(), afterLineDiscount);
-        BigDecimal totalDiscount = money(lineDiscounts.add(orderDiscount));
-        allocateOrderDiscount(order, orderDiscount, taxRate);
+        long loyaltyPoints = request.loyaltyPointsToRedeem() == null ? 0 : request.loyaltyPointsToRedeem();
+        BigDecimal loyaltyDiscount = loyaltyPoints > 0
+                ? loyaltyDiscount(request, currency, loyaltyPoints, afterLineDiscount.subtract(orderDiscount))
+                : ZERO;
+        BigDecimal totalDiscount = money(lineDiscounts.add(orderDiscount).add(loyaltyDiscount));
+        allocateOrderDiscount(order, orderDiscount.add(loyaltyDiscount), taxRate);
+        order.setLoyaltyPointsRedeemed(loyaltyPoints);
         BigDecimal tax = money(order.getItems().stream()
                 .map(OrderItem::getTaxAmount).reduce(ZERO, BigDecimal::add));
         order.setSubtotal(money(subtotal));
@@ -194,7 +202,33 @@ public class OrderService {
                     .appliedBy(request.cashierId())
                     .build());
         }
+        if (loyaltyDiscount.signum() > 0) {
+            order.addDiscount(OrderDiscount.builder()
+                    .name("Loyalty points")
+                    .method(DiscountMethod.LOYALTY)
+                    .type(DiscountType.FIXED)
+                    .scope(DiscountScope.ORDER)
+                    .value(loyaltyDiscount)
+                    .currencyCode(currency)
+                    .amount(loyaltyDiscount)
+                    .reason("Redeemed " + loyaltyPoints + " points")
+                    .appliedBy(request.cashierId())
+                    .build());
+        }
         return order;
+    }
+
+    /** Asks the customer service what the points are worth; they are only spent when the order completes. */
+    private BigDecimal loyaltyDiscount(CreatePosOrderRequest request, String currency, long points, BigDecimal remaining) {
+        if (request.customerId() == null || request.customerId() <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Select a customer to redeem loyalty points");
+        }
+        BigDecimal usdToKhrRate = "KHR".equals(currency) ? resolveUsdToKhrRate(request.businessId()) : null;
+        BigDecimal value = money(loyaltyClient.quote(request.businessId(), request.customerId(), points, currency, usdToKhrRate));
+        if (value.compareTo(remaining) > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "These points are worth more than the sale. Use fewer points.");
+        }
+        return value;
     }
 
     public OrderResponse createOnline(CreateOnlineOrderRequest request) {
@@ -278,7 +312,7 @@ public class OrderService {
         Order order = persistenceService.require(id);
         if (order.getOrderStatus() == OrderStatus.COMPLETED) {
             discountService.redeem(id);
-            return toResponse(order);
+            return toResponse(settleLoyalty(order));
         }
         if (order.getOrderStatus() == OrderStatus.CANCELLED || order.getOrderStatus() == OrderStatus.DRAFT) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Order cannot be completed from status " + order.getOrderStatus());
@@ -317,8 +351,30 @@ public class OrderService {
             throw exception;
         }
         discountService.redeem(id);
+        completed = settleLoyalty(completed);
         publishOrderCompleted(completed);
         return toResponse(completed);
+    }
+
+    /**
+     * Spends the points the order redeemed and adds the points it earned. A loyalty outage never blocks a
+     * sale; an order whose loyalty was not settled is settled again if its completion is retried.
+     */
+    private Order settleLoyalty(Order order) {
+        if (order.getCustomerId() == null || order.getCustomerId() <= 0 || order.getLoyaltyPointsEarned() != null) {
+            return order;
+        }
+        try {
+            BigDecimal usdToKhrRate = "KHR".equals(order.getCurrencyCode()) ? resolveUsdToKhrRate(order.getBusinessId()) : null;
+            LoyaltyClient.Settlement settlement = loyaltyClient.settle(
+                    order.getId(), order.getBusinessId(), order.getCustomerId(), order.getOrderNo(), order.getGrandTotal(),
+                    order.getCurrencyCode(), usdToKhrRate,
+                    order.getLoyaltyPointsRedeemed() == null ? 0 : order.getLoyaltyPointsRedeemed());
+            return persistenceService.recordLoyaltyEarned(order.getId(), settlement.earnedPoints());
+        } catch (RuntimeException exception) {
+            log.warn("Loyalty points for order {} were not settled: {}", order.getOrderNo(), exception.getMessage());
+            return order;
+        }
     }
 
     public OrderResponse cancel(Long id) {
@@ -480,7 +536,8 @@ public class OrderService {
                 order.getDiscountValue(), order.getDiscount(), order.getTax(), order.getDeliveryFee(), order.getGrandTotal(),
                 order.getFulfillmentType(), toResponse(order.getDeliveryAddress()), order.getNote(),
                 order.getDiscounts().stream().map(this::toResponse).toList(),
-                items, order.getCreatedAt(), order.getCompletedAt());
+                items, order.getCreatedAt(), order.getCompletedAt(),
+                order.getLoyaltyPointsRedeemed(), order.getLoyaltyPointsEarned());
     }
 
     private DeliveryAddressResponse toResponse(DeliveryAddress address) {

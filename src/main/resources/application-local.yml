@@ -36,5 +36,7 @@ services:
     base-url: http://127.0.0.1:8082
   inventory:
     base-url: http://127.0.0.1:8085
+  customer:
+    base-url: http://127.0.0.1:8091
   payment:
     base-url: http://127.0.0.1:8084

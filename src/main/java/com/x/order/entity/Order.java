@@ -100,6 +100,15 @@ public class Order {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    /** Loyalty points the customer spends on this order; deducted when it completes. */
+    @Builder.Default
+    @Column(name = "loyalty_points_redeemed", nullable = false, columnDefinition = "bigint not null default 0")
+    private Long loyaltyPointsRedeemed = 0L;
+
+    /** Points the order earned; null until loyalty is settled at completion. */
+    @Column(name = "loyalty_points_earned")
+    private Long loyaltyPointsEarned;
+
     @Version
     private Long version;
 
