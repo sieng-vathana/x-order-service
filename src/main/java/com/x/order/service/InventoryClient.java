@@ -50,6 +50,23 @@ public class InventoryClient {
         }
     }
 
+    /** Units that can still be sold: on hand minus reserved. */
+    public long availableQuantity(Long storeId, Long variantId) {
+        ApiResponse<StockLevel> response = client.get()
+                .uri(uriBuilder -> uriBuilder.path("/balance")
+                        .queryParam("storeId", storeId)
+                        .queryParam("variantId", variantId)
+                        .build())
+                .retrieve().body(new ParameterizedTypeReference<>() {});
+        if (response == null || response.getData() == null) {
+            throw new IllegalStateException("Inventory service returned no stock balance");
+        }
+        return response.getData().availableQuantity();
+    }
+
+    public record StockLevel(long availableQuantity) {
+    }
+
     public void consume(Long reservationId) {
         client.post().uri("/reservations/{id}/consume", reservationId).retrieve().toBodilessEntity();
     }
