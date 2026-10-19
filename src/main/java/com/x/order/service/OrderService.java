@@ -49,6 +49,7 @@ public class OrderService {
         if (existing != null) return toResponse(existing);
 
         businessClient.requireApproved(request.businessId());
+        businessClient.requireStoreOpen(request.storeId());
 
         Order order = buildPosOrder(request, OrderStatus.PENDING_PAYMENT);
         BigDecimal taxRate = money(request.taxRate() == null ? ZERO : request.taxRate());
@@ -86,6 +87,7 @@ public class OrderService {
         }
 
         businessClient.requireApproved(request.businessId());
+        businessClient.requireStoreOpen(request.storeId());
 
         CreatePosOrderRequest posRequest = new CreatePosOrderRequest(
                 request.businessId(), request.storeId(), request.customerId(), request.counterId(), request.cashierId(),
@@ -241,6 +243,7 @@ public class OrderService {
         if (existing != null) return toResponse(existing);
 
         businessClient.requireApproved(request.businessId());
+        businessClient.requireStoreOpen(request.storeId());
 
         String currency = normalizeCurrency(request.currencyCode());
         BigDecimal taxRate = money(request.taxRate() == null ? ZERO : request.taxRate());
