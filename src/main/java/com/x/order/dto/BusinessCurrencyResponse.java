@@ -6,5 +6,10 @@ import java.math.BigDecimal;
 public record BusinessCurrencyResponse(
         Long id,
         String defaultCurrencyCode,
-        BigDecimal usdToKhrExchangeRate) {
+        BigDecimal usdToKhrExchangeRate,
+        Integer status) {
+
+    public BusinessCurrencyResponse(Long id, String defaultCurrencyCode, BigDecimal usdToKhrExchangeRate) {
+        this(id, defaultCurrencyCode, usdToKhrExchangeRate, 1);
+    }
 }

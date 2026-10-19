@@ -5,7 +5,9 @@ import com.x.order.dto.BusinessCurrencyResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.server.ResponseStatusException;
 
 @Component
 public class BusinessClient {
@@ -26,5 +28,13 @@ public class BusinessClient {
             throw new IllegalStateException("Business service returned no currency settings");
         }
         return response.getData();
+    }
+
+    public void requireApproved(Long businessId) {
+        BusinessCurrencyResponse business = getCurrencySettings(businessId);
+        if (business.status() == null || business.status() != 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Merchant approval is required before accepting orders");
+        }
     }
 }

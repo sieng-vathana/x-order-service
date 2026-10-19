@@ -48,6 +48,8 @@ public class OrderService {
         Order existing = persistenceService.findByIdempotencyKey(idempotencyKey).orElse(null);
         if (existing != null) return toResponse(existing);
 
+        businessClient.requireApproved(request.businessId());
+
         Order order = buildPosOrder(request, OrderStatus.PENDING_PAYMENT);
         BigDecimal taxRate = money(request.taxRate() == null ? ZERO : request.taxRate());
         Order saved = hasText(request.discountCode())
@@ -82,6 +84,8 @@ public class OrderService {
             }
             return toResponse(existing);
         }
+
+        businessClient.requireApproved(request.businessId());
 
         CreatePosOrderRequest posRequest = new CreatePosOrderRequest(
                 request.businessId(), request.storeId(), request.customerId(), request.counterId(), request.cashierId(),
@@ -235,6 +239,8 @@ public class OrderService {
         String idempotencyKey = request.idempotencyKey().trim();
         Order existing = persistenceService.findByIdempotencyKey(idempotencyKey).orElse(null);
         if (existing != null) return toResponse(existing);
+
+        businessClient.requireApproved(request.businessId());
 
         String currency = normalizeCurrency(request.currencyCode());
         BigDecimal taxRate = money(request.taxRate() == null ? ZERO : request.taxRate());
