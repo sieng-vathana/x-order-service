@@ -63,18 +63,40 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
             Pageable pageable);
 
     @Query(value = """
-            select date(o.completed_at) as salesDate,
+            select date(date_add(o.completed_at, interval :offsetMinutes minute)) as salesDate,
                    count(o.id) as orderCount,
                    coalesce(sum(o.grand_total), 0) as grandTotal
               from orders o
              where o.store_id = :storeId and o.order_status = :status
                and o.currency_code = :currencyCode
                and o.completed_at >= :from and o.completed_at < :to
-             group by date(o.completed_at)
-             order by date(o.completed_at)
+             group by salesDate
+             order by salesDate
             """, nativeQuery = true)
     List<SalesTrendProjection> salesTrend(
             @Param("storeId") Long storeId, @Param("status") String status,
             @Param("currencyCode") String currencyCode,
-            @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+            @Param("from") LocalDateTime from, @Param("to") LocalDateTime to,
+            @Param("offsetMinutes") int offsetMinutes);
+
+    /** Completed sales per hour, day or month; offsetMinutes moves the stored UTC times into the viewer's zone. */
+    @Query(value = """
+            select date_format(date_add(o.completed_at, interval :offsetMinutes minute), :pattern) as period,
+                   count(o.id) as orderCount,
+                   coalesce(sum(o.subtotal), 0) as subtotal,
+                   coalesce(sum(o.discount), 0) as discount,
+                   coalesce(sum(o.tax), 0) as tax,
+                   coalesce(sum(o.grand_total), 0) as grandTotal
+              from orders o
+             where o.store_id = :storeId and o.order_status = :status
+               and o.currency_code = :currencyCode
+               and o.completed_at >= :from and o.completed_at < :to
+             group by period
+             order by period
+            """, nativeQuery = true)
+    List<SalesBreakdownProjection> salesBreakdown(
+            @Param("storeId") Long storeId, @Param("status") String status,
+            @Param("currencyCode") String currencyCode,
+            @Param("from") LocalDateTime from, @Param("to") LocalDateTime to,
+            @Param("offsetMinutes") int offsetMinutes, @Param("pattern") String pattern);
 }

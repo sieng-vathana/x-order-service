@@ -61,11 +61,11 @@ class OrderControllerTest {
     @Test
     void salesTrendUsesSharedApiResponseEnvelope() {
         OrderController controller = new OrderController(orderService);
-        when(orderService.salesTrend(2L, "USD", LocalDateTime.of(2026, 8, 15, 0, 0), LocalDateTime.of(2026, 8, 22, 0, 0)))
+        when(orderService.salesTrend(2L, "USD", LocalDateTime.of(2026, 8, 15, 0, 0), LocalDateTime.of(2026, 8, 22, 0, 0), "Asia/Phnom_Penh"))
                 .thenReturn(List.of(new SalesTrendResponse(LocalDate.of(2026, 8, 20), 3, new BigDecimal("42.00"))));
 
         var response = controller.salesTrend(2L, "USD",
-                LocalDateTime.of(2026, 8, 15, 0, 0), LocalDateTime.of(2026, 8, 22, 0, 0));
+                LocalDateTime.of(2026, 8, 15, 0, 0), LocalDateTime.of(2026, 8, 22, 0, 0), "Asia/Phnom_Penh");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();

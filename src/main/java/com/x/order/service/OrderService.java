@@ -457,10 +457,42 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public List<SalesTrendResponse> salesTrend(Long storeId, String currencyCode, LocalDateTime from, LocalDateTime to) {
+        return salesTrend(storeId, currencyCode, from, to, null);
+    }
+
+    /** Daily sales; timeZone (e.g. Asia/Phnom_Penh) decides which day a sale falls on, UTC when absent. */
+    @Transactional(readOnly = true)
+    public List<SalesTrendResponse> salesTrend(Long storeId, String currencyCode, LocalDateTime from, LocalDateTime to, String timeZone) {
         validateRange(from, to);
-        return orderRepository.salesTrend(storeId, OrderStatus.COMPLETED.name(), normalizeCurrency(currencyCode), from, to)
+        return orderRepository.salesTrend(storeId, OrderStatus.COMPLETED.name(), normalizeCurrency(currencyCode), from, to,
+                        offsetMinutes(timeZone, from))
                 .stream().map(row -> new SalesTrendResponse(
                         row.getSalesDate().toLocalDate(), row.getOrderCount(), row.getGrandTotal())).toList();
+    }
+
+    /** Completed sales split by hour, day or month in the viewer's time zone; periods without sales are left out. */
+    @Transactional(readOnly = true)
+    public List<SalesBreakdownResponse> salesBreakdown(Long storeId, String currencyCode, LocalDateTime from, LocalDateTime to,
+                                                       ReportBucket bucket, String timeZone) {
+        validateRange(from, to);
+        if (java.time.Duration.between(from, to).toDays() > 400) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A sales breakdown can cover at most 400 days");
+        }
+        return orderRepository.salesBreakdown(storeId, OrderStatus.COMPLETED.name(), normalizeCurrency(currencyCode), from, to,
+                        offsetMinutes(timeZone, from), bucket.pattern())
+                .stream().map(row -> new SalesBreakdownResponse(row.getPeriod(), row.getOrderCount(), row.getSubtotal(),
+                        row.getDiscount(), row.getTax(), row.getGrandTotal())).toList();
+    }
+
+    /** Minutes to add to a stored UTC time to get the time in the zone, taken at the start of the range. */
+    static int offsetMinutes(String timeZone, LocalDateTime utcFrom) {
+        if (timeZone == null || timeZone.isBlank()) return 0;
+        try {
+            return java.time.ZoneId.of(timeZone.trim()).getRules()
+                    .getOffset(utcFrom.toInstant(java.time.ZoneOffset.UTC)).getTotalSeconds() / 60;
+        } catch (java.time.DateTimeException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown time zone " + timeZone);
+        }
     }
 
     private void validateVariant(CreatePosOrderRequest request, String currency, ProductVariantSaleResponse variant) {

@@ -144,7 +144,21 @@ public class OrderController {
             @RequestParam @Positive Long storeId,
             @RequestParam String currencyCode,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
-        return ResponseEntity.ok(ApiResponse.success(200, orderService.salesTrend(storeId, currencyCode, from, to)));
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
+            @RequestParam(required = false) String timeZone) {
+        return ResponseEntity.ok(ApiResponse.success(200, orderService.salesTrend(storeId, currencyCode, from, to, timeZone)));
+    }
+
+    /** from and to are UTC; the periods are labelled in timeZone. */
+    @GetMapping("/reports/sales-breakdown")
+    public ResponseEntity<ApiResponse<List<SalesBreakdownResponse>>> salesBreakdown(
+            @RequestParam @Positive Long storeId,
+            @RequestParam String currencyCode,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
+            @RequestParam(defaultValue = "DAY") ReportBucket bucket,
+            @RequestParam(required = false) String timeZone) {
+        return ResponseEntity.ok(ApiResponse.success(200,
+                orderService.salesBreakdown(storeId, currencyCode, from, to, bucket, timeZone)));
     }
 }
