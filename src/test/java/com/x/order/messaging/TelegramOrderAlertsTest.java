@@ -53,7 +53,7 @@ class TelegramOrderAlertsTest {
 
         alerts.onOrderCreated(created(OrderChannel.ONLINE));
 
-        verify(telegramAlertClient).send(2L, "ONLINE_ORDER", """
+        verify(telegramAlertClient).send(2L, 3L, "ONLINE_ORDER", """
                 🛒 New online order ORD-7
                 $25.00 · 3 items
                 • Iced latte (Large) x2
@@ -66,7 +66,7 @@ class TelegramOrderAlertsTest {
         alerts.onOrderCreated(created(OrderChannel.POS));
 
         verify(telegramAlertClient, never()).settings(anyLong());
-        verify(telegramAlertClient, never()).send(anyLong(), anyString(), anyString());
+        verify(telegramAlertClient, never()).send(anyLong(), any(), anyString(), anyString());
     }
 
     @Test
@@ -82,7 +82,7 @@ class TelegramOrderAlertsTest {
 
         alerts.onOrderCompleted(completed());
 
-        verify(telegramAlertClient).send(2L, "LOW_STOCK", "⚠️ Low stock after order ORD-7\n• Iced latte: 4 left");
+        verify(telegramAlertClient).send(2L, 3L, "LOW_STOCK", "⚠️ Low stock after order ORD-7\n• Iced latte: 4 left");
     }
 
     @Test

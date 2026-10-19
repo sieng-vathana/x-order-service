@@ -12,6 +12,7 @@ import org.springframework.web.client.RestClientException;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Map;
 
 /** Reads a business's Telegram alert switches and hands alerts to the business service. */
@@ -55,12 +56,17 @@ public class TelegramAlertClient {
         }
     }
 
-    public void send(Long businessId, String type, String text) {
+    /** The alert goes to the business's chats that cover the store; without a store, to all of them. */
+    public void send(Long businessId, Long storeId, String type, String text) {
+        Map<String, Object> body = new HashMap<>(Map.of("type", type, "text", text));
+        if (storeId != null) {
+            body.put("storeId", storeId);
+        }
         try {
             client.post()
                     .uri("/internal/businesses/{id}/telegram/notify", businessId)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("type", type, "text", text))
+                    .body(body)
                     .retrieve()
                     .toBodilessEntity();
         } catch (RestClientException exception) {

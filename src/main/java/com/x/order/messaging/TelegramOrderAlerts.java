@@ -49,7 +49,7 @@ public class TelegramOrderAlerts {
                 return;
             }
             orderRepository.findByIdWithItems(event.orderId())
-                    .ifPresent(order -> telegramAlertClient.send(order.getBusinessId(), "ONLINE_ORDER", onlineOrderText(order)));
+                    .ifPresent(order -> telegramAlertClient.send(order.getBusinessId(), order.getStoreId(), "ONLINE_ORDER", onlineOrderText(order)));
         } catch (RuntimeException exception) {
             log.warn("Online order alert for {} failed: {}", event.orderNo(), exception.getMessage());
         }
@@ -85,7 +85,7 @@ public class TelegramOrderAlerts {
                 }
             });
             if (!lowLines.isEmpty()) {
-                telegramAlertClient.send(order.getBusinessId(), "LOW_STOCK",
+                telegramAlertClient.send(order.getBusinessId(), order.getStoreId(), "LOW_STOCK",
                         "⚠️ Low stock after order " + order.getOrderNo() + "\n" + String.join("\n", lowLines));
             }
         } catch (RuntimeException exception) {
