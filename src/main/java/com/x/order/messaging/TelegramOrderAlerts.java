@@ -7,8 +7,9 @@ import com.x.order.entity.OrderItem;
 import com.x.order.event.OrderCompletedEvent;
 import com.x.order.event.OrderCreatedEvent;
 import com.x.order.repository.OrderRepository;
+import com.x.order.service.CustomerNameClient;
 import com.x.order.service.InventoryClient;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -28,7 +29,6 @@ import java.util.stream.Stream;
 
 /** Sends new online orders, and products a sale left low in stock, to the merchant's Telegram chat. */
 @Component
-@RequiredArgsConstructor
 public class TelegramOrderAlerts {
 
     private static final Logger log = LoggerFactory.getLogger(TelegramOrderAlerts.class);
@@ -37,6 +37,26 @@ public class TelegramOrderAlerts {
     private final OrderRepository orderRepository;
     private final InventoryClient inventoryClient;
     private final TelegramAlertClient telegramAlertClient;
+    private final CustomerNameClient customerNameClient;
+
+    @Autowired
+    public TelegramOrderAlerts(
+            OrderRepository orderRepository,
+            InventoryClient inventoryClient,
+            TelegramAlertClient telegramAlertClient,
+            CustomerNameClient customerNameClient) {
+        this.orderRepository = orderRepository;
+        this.inventoryClient = inventoryClient;
+        this.telegramAlertClient = telegramAlertClient;
+        this.customerNameClient = customerNameClient;
+    }
+
+    TelegramOrderAlerts(
+            OrderRepository orderRepository,
+            InventoryClient inventoryClient,
+            TelegramAlertClient telegramAlertClient) {
+        this(orderRepository, inventoryClient, telegramAlertClient, null);
+    }
 
     @Transactional(readOnly = true)
     public void onOrderCreated(OrderCreatedEvent event) {
@@ -48,8 +68,16 @@ public class TelegramOrderAlerts {
             if (!settings.connected() || !settings.orderAlerts()) {
                 return;
             }
-            orderRepository.findByIdWithItems(event.orderId())
-                    .ifPresent(order -> telegramAlertClient.send(order.getBusinessId(), order.getStoreId(), "ONLINE_ORDER", onlineOrderText(order)));
+            orderRepository.findByIdWithItems(event.orderId()).ifPresent(order -> {
+                String customerName = customerNameClient == null
+                        ? null
+                        : customerNameClient.findName(order.getBusinessId(), order.getCustomerId());
+                if (!StringUtils.hasText(customerName) && order.getDeliveryAddress() != null) {
+                    customerName = order.getDeliveryAddress().getReceiverName();
+                }
+                telegramAlertClient.send(order.getBusinessId(), order.getStoreId(), "ONLINE_ORDER",
+                        onlineOrderText(order, customerName));
+            });
         } catch (RuntimeException exception) {
             log.warn("Online order alert for {} failed: {}", event.orderNo(), exception.getMessage());
         }
@@ -94,6 +122,10 @@ public class TelegramOrderAlerts {
     }
 
     static String onlineOrderText(Order order) {
+        return onlineOrderText(order, null);
+    }
+
+    static String onlineOrderText(Order order, String customerName) {
         List<OrderItem> items = order.getItems();
         int units = items.stream().mapToInt(item -> item.getQty() == null ? 0 : item.getQty()).sum();
         StringBuilder text = new StringBuilder("🛒 New online order ").append(order.getOrderNo()).append('\n')
@@ -103,6 +135,9 @@ public class TelegramOrderAlerts {
                 .forEach(item -> text.append("\n• ").append(itemName(item)).append(" x").append(item.getQty()));
         if (items.size() > MAX_ITEM_LINES) {
             text.append("\n…and ").append(items.size() - MAX_ITEM_LINES).append(" more");
+        }
+        if (StringUtils.hasText(customerName)) {
+            text.append("\n👤 Customer: ").append(customerName.trim().replaceAll("[\\p{Cntrl}]", " "));
         }
         DeliveryAddress address = order.getDeliveryAddress();
         if (address != null) {
