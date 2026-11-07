@@ -406,6 +406,23 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
+    public Page<OrderResponse> getCustomerOrders(Long customerId, int page, int size) {
+        return orderRepository.findByCustomerIdAndOrderChannel(
+                        customerId, OrderChannel.ONLINE,
+                        PageRequest.of(page, size, Sort.by("createdAt").descending()))
+                .map(this::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public OrderResponse getCustomerOrder(Long customerId, Long orderId) {
+        Order order = orderRepository.findByIdWithItems(orderId)
+                .filter(candidate -> Objects.equals(candidate.getCustomerId(), customerId)
+                        && candidate.getOrderChannel() == OrderChannel.ONLINE)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+        return toResponse(order);
+    }
+
+    @Transactional(readOnly = true)
     public Page<OrderResponse> list(Long storeId, int page, int size) {
         return list(storeId, null, null, null, null, page, size);
     }
@@ -529,7 +546,18 @@ public class OrderService {
         if (!request.storeId().equals(quote.storeId()) || !currency.equalsIgnoreCase(quote.currencyCode())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Delivery quote does not match this store or currency");
         }
+        if (request.deliveryAddress() == null
+                || !sameCoordinate(quote.destinationLatitude(), request.deliveryAddress().latitude())
+                || !sameCoordinate(quote.destinationLongitude(), request.deliveryAddress().longitude())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Delivery quote does not match the delivery address coordinates");
+        }
         return money(quote.quotedFee());
+    }
+
+    private boolean sameCoordinate(BigDecimal left, BigDecimal right) {
+        return left != null && right != null
+                && left.setScale(7, RoundingMode.HALF_UP).compareTo(right.setScale(7, RoundingMode.HALF_UP)) == 0;
     }
 
     private void attachDeliveryAddress(Order order, DeliveryAddressRequest request) {

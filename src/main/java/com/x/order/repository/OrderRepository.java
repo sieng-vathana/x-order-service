@@ -20,6 +20,10 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
     Optional<Order> findByIdempotencyKey(String idempotencyKey);
     Page<Order> findByStoreId(Long storeId, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"items", "deliveryAddress"})
+    Page<Order> findByCustomerIdAndOrderChannel(
+            Long customerId, OrderChannel orderChannel, Pageable pageable);
+
     @EntityGraph(attributePaths = "items")
     Page<Order> findByStoreIdAndOrderChannelAndOrderStatus(
             Long storeId, OrderChannel orderChannel, OrderStatus orderStatus, Pageable pageable);

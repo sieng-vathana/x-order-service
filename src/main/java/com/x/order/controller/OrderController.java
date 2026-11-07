@@ -95,6 +95,24 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success(200, orderService.get(id)));
     }
 
+    @GetMapping("/customer/{customerId}")
+    public ResponseEntity<ApiResponse<PageResponse<OrderResponse>>> getCustomerOrders(
+            @PathVariable @Positive Long customerId,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+        Page<OrderResponse> result = orderService.getCustomerOrders(customerId, page, size);
+        return ResponseEntity.ok(ApiResponse.success(200, new PageResponse<>(
+                result.getContent(), result.getNumber(), result.getSize(), result.getTotalElements(),
+                result.getTotalPages(), result.hasNext())));
+    }
+
+    @GetMapping("/customer/{customerId}/{orderId}")
+    public ResponseEntity<ApiResponse<OrderResponse>> getCustomerOrder(
+            @PathVariable @Positive Long customerId,
+            @PathVariable @Positive Long orderId) {
+        return ResponseEntity.ok(ApiResponse.success(200, orderService.getCustomerOrder(customerId, orderId)));
+    }
+
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<OrderResponse>>> list(
             @RequestParam @Positive Long storeId,

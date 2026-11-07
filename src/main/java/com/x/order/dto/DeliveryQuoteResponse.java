@@ -5,5 +5,6 @@ import java.time.LocalDateTime;
 
 public record DeliveryQuoteResponse(
         Long id, Long storeId, String providerType, BigDecimal distanceKm,
-        BigDecimal quotedFee, String currencyCode, LocalDateTime expiresAt) {
+        BigDecimal quotedFee, String currencyCode, LocalDateTime expiresAt,
+        BigDecimal destinationLatitude, BigDecimal destinationLongitude) {
 }
