@@ -30,6 +30,13 @@ public class Order {
     @Column(name = "customer_id")
     private Long customerId;
 
+    /** Who to contact about an online order; the only contact for a guest pickup order. */
+    @Column(name = "contact_name", length = 160)
+    private String contactName;
+
+    @Column(name = "contact_phone", length = 32)
+    private String contactPhone;
+
     @Column(name = "store_id")
     private Long storeId;
 

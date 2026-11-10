@@ -10,7 +10,10 @@ import java.util.List;
 public record CreateOnlineOrderRequest(
         @NotNull @Positive Long businessId,
         @NotNull @Positive Long storeId,
-        @NotNull @Positive Long customerId,
+        /** Null for a guest order; contactName and contactPhone are then required. */
+        @Positive Long customerId,
+        @Size(max = 160) String contactName,
+        @Size(max = 32) String contactPhone,
         @NotBlank @Pattern(regexp = "[A-Za-z]{3}") String currencyCode,
         @NotNull FulfillmentType fulfillmentType,
         @NotNull OnlinePaymentType paymentType,
@@ -21,6 +24,12 @@ public record CreateOnlineOrderRequest(
         @Size(max = 500) String note,
         @NotBlank @Size(max = 100) String idempotencyKey,
         @NotEmpty List<@Valid OnlineOrderItemRequest> items) {
+
+    @AssertTrue(message = "A guest order needs a contact name and phone")
+    public boolean hasGuestContact() {
+        return customerId != null
+                || (contactName != null && !contactName.isBlank() && contactPhone != null && !contactPhone.isBlank());
+    }
 
     @AssertTrue(message = "A delivery quote and delivery address are required unless the customer picks up")
     public boolean hasFulfillmentDetails() {

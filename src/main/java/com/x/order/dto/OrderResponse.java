@@ -13,5 +13,6 @@ public record OrderResponse(
         BigDecimal discount, BigDecimal tax, BigDecimal deliveryFee, BigDecimal grandTotal,
         FulfillmentType fulfillmentType, DeliveryAddressResponse deliveryAddress, String note,
         List<AppliedDiscountResponse> discounts, List<OrderItemResponse> items,
-        LocalDateTime createdAt, LocalDateTime completedAt, Long loyaltyPointsRedeemed, Long loyaltyPointsEarned) {
+        LocalDateTime createdAt, LocalDateTime completedAt, Long loyaltyPointsRedeemed, Long loyaltyPointsEarned,
+        String contactName, String contactPhone) {
 }

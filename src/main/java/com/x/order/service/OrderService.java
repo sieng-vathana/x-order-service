@@ -250,6 +250,7 @@ public class OrderService {
         BigDecimal deliveryFee = resolveDeliveryFee(request, currency);
         Order order = Order.builder()
                 .businessId(request.businessId()).storeId(request.storeId()).customerId(request.customerId())
+                .contactName(trimToNull(request.contactName())).contactPhone(trimToNull(request.contactPhone()))
                 .orderNo("WEB-" + UUID.randomUUID().toString().substring(0, 12).toUpperCase(Locale.ROOT))
                 .orderChannel(OrderChannel.ONLINE).orderStatus(OrderStatus.PENDING_CONFIRMATION)
                 .paymentStatus(request.paymentType() == OnlinePaymentType.COD
@@ -606,7 +607,8 @@ public class OrderService {
                 order.getFulfillmentType(), toResponse(order.getDeliveryAddress()), order.getNote(),
                 order.getDiscounts().stream().map(this::toResponse).toList(),
                 items, order.getCreatedAt(), order.getCompletedAt(),
-                order.getLoyaltyPointsRedeemed(), order.getLoyaltyPointsEarned());
+                order.getLoyaltyPointsRedeemed(), order.getLoyaltyPointsEarned(),
+                order.getContactName(), order.getContactPhone());
     }
 
     private DeliveryAddressResponse toResponse(DeliveryAddress address) {
@@ -664,6 +666,10 @@ public class OrderService {
 
     private boolean hasManualDiscount(DiscountType type, BigDecimal rawValue) {
         return type != null || (rawValue != null && rawValue.signum() != 0);
+    }
+
+    private static String trimToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private boolean hasText(String value) {
