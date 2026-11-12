@@ -287,7 +287,7 @@ public class OrderService {
         List<Long> reservations = new ArrayList<>();
         try {
             for (OrderItem item : saved.getItems()) {
-                StockReservationResponse reservation = inventoryClient.reserve(
+                StockReservationResponse reservation = inventoryClient.reserveForOnlineOrder(
                         saved.getStoreId(), item.getVariantId(), saved.getId(), item.getQty());
                 reservations.add(reservation.id());
                 saved = persistenceService.attachReservation(saved.getId(), item.getId(), reservation.id());
@@ -346,8 +346,7 @@ public class OrderService {
                 if (item.getReservationId() == null) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "Order item has no stock reservation");
                 }
-                inventoryClient.consume(item.getReservationId());
-                consumedReservations.add(item.getReservationId());
+                consumedReservations.add(consumeOrRenew(order, item));
             }
         } catch (RuntimeException exception) {
             consumedReservations.forEach(this::reopenQuietly);
@@ -759,6 +758,30 @@ public class OrderService {
         return money(amount.divide(unit, 0, RoundingMode.HALF_UP).multiply(unit));
     }
     private BigDecimal money(BigDecimal value) { return value.setScale(2, RoundingMode.HALF_UP); }
+    /**
+     * Takes the item's held stock out of inventory. An order completed after its hold lapsed (an online order
+     * collected days later) takes the stock again and uses it at once; without the stock, completion fails.
+     */
+    private Long consumeOrRenew(Order order, OrderItem item) {
+        try {
+            inventoryClient.consume(item.getReservationId());
+            return item.getReservationId();
+        } catch (RuntimeException exception) {
+            if (!InventoryClient.holdNotActive(exception)) throw exception;
+        }
+        StockReservationResponse renewed = inventoryClient.reserve(
+                order.getStoreId(), item.getVariantId(), order.getId(), item.getQty());
+        try {
+            inventoryClient.consume(renewed.id());
+        } catch (RuntimeException exception) {
+            releaseQuietly(renewed.id());
+            throw exception;
+        }
+        persistenceService.attachReservation(order.getId(), item.getId(), renewed.id());
+        log.info("Stock hold for order {} had lapsed; took the stock again on completion", order.getOrderNo());
+        return renewed.id();
+    }
+
     private void releaseQuietly(Long id) { try { inventoryClient.release(id); } catch (RuntimeException ignored) { } }
     private void reopenQuietly(Long id) { try { inventoryClient.reopen(id); } catch (RuntimeException ignored) { } }
     private void validateRange(LocalDateTime from, LocalDateTime to) {

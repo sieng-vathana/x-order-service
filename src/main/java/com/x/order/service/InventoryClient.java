@@ -10,10 +10,16 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 @Component
 public class InventoryClient {
+    /** A till sale is paid within minutes. */
+    static final Duration SALE_HOLD = Duration.ofMinutes(15);
+    /** An online order waits for the store to prepare it and for the buyer to collect or receive it. */
+    static final Duration ONLINE_ORDER_HOLD = Duration.ofDays(3);
+
     private final RestClient client;
 
     public InventoryClient(RestClient.Builder builder,
@@ -27,11 +33,20 @@ public class InventoryClient {
 
     public StockReservationResponse reserve(
             Long storeId, Long variantId, Long orderId, long quantity, boolean allowNegativeStock) {
+        return reserve(storeId, variantId, orderId, quantity, allowNegativeStock, SALE_HOLD);
+    }
+
+    public StockReservationResponse reserveForOnlineOrder(Long storeId, Long variantId, Long orderId, long quantity) {
+        return reserve(storeId, variantId, orderId, quantity, false, ONLINE_ORDER_HOLD);
+    }
+
+    private StockReservationResponse reserve(
+            Long storeId, Long variantId, Long orderId, long quantity, boolean allowNegativeStock, Duration holdFor) {
         record Request(Long storeId, Long variantId, Long orderId, long quantity,
                        LocalDateTime expiresAt, boolean allowNegativeStock) {}
         try {
             ApiResponse<StockReservationResponse> response = client.post().uri("/reservations/with-details")
-                    .body(new Request(storeId, variantId, orderId, quantity, LocalDateTime.now().plusMinutes(15), allowNegativeStock))
+                    .body(new Request(storeId, variantId, orderId, quantity, LocalDateTime.now().plus(holdFor), allowNegativeStock))
                     .retrieve().body(new ParameterizedTypeReference<>() {});
             if (response == null || response.getData() == null) {
                 throw new IllegalStateException("Inventory service returned no reservation");
@@ -69,6 +84,13 @@ public class InventoryClient {
 
     public void consume(Long reservationId) {
         client.post().uri("/reservations/{id}/consume", reservationId).retrieve().toBodilessEntity();
+    }
+
+    /** True when inventory refused to consume because the hold is no longer active (it expired or was released). */
+    public static boolean holdNotActive(RuntimeException exception) {
+        return exception instanceof RestClientResponseException response
+                && response.getStatusCode().value() == HttpStatus.CONFLICT.value()
+                && response.getResponseBodyAsString().contains("Only an active reservation");
     }
 
     public void release(Long reservationId) {
